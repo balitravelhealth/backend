@@ -1,52 +1,58 @@
 # BaliTravelHealth Platform Backend
 
-Backend dan dashboard admin untuk platform kesehatan wisatawan Bali. Repository ini berisi API gateway berbasis Go, service sistem pakar berbasis Python/FastAPI, database PostgreSQL, migrasi SQL, dan web admin berbasis Next.js.
+Backend, expert-system service, database migrations, and admin dashboard for a Bali travel health platform.
 
-> Catatan medis: sistem ini hanya alat bantu informasi dan triase awal. Hasil diagnosis, rekomendasi, dan panduan darurat wajib divalidasi oleh tenaga kesehatan berwenang sebelum digunakan di lingkungan produksi. Sistem ini tidak menggantikan konsultasi dokter, perawat, fasilitas kesehatan, atau layanan gawat darurat.
+This repository contains a Go API gateway, a Python/FastAPI expert-system service, PostgreSQL schema migrations, Docker infrastructure, and a Next.js web admin dashboard.
 
-## Daftar Isi
+> Medical disclaimer: this system is intended as an informational and early triage support tool only. Diagnosis output, recommendations, emergency guide content, and health knowledge base data must be reviewed and validated by qualified healthcare professionals before production use. This software does not replace doctors, nurses, licensed medical services, emergency services, or direct clinical evaluation.
 
-- [Fitur Utama](#fitur-utama)
-- [Arsitektur](#arsitektur)
-- [Struktur Repository](#struktur-repository)
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Repository Structure](#repository-structure)
 - [Requirements](#requirements)
-- [Konfigurasi Environment](#konfigurasi-environment)
-- [Menjalankan dengan Docker Compose](#menjalankan-dengan-docker-compose)
-- [Menjalankan Secara Lokal](#menjalankan-secara-lokal)
-- [Migrasi Database](#migrasi-database)
-- [API Endpoint](#api-endpoint)
-- [Sistem Pakar](#sistem-pakar)
-- [Skema Database](#skema-database)
+- [Environment Configuration](#environment-configuration)
+- [Running with Docker Compose](#running-with-docker-compose)
+- [Running Locally](#running-locally)
+- [Database Migrations](#database-migrations)
+- [API Endpoints](#api-endpoints)
+- [Expert System](#expert-system)
+- [Database Schema](#database-schema)
 - [Testing](#testing)
-- [Keamanan dan Checklist Open Source](#keamanan-dan-checklist-open-source)
-- [Lisensi Dependency Open Source](#lisensi-dependency-open-source)
-- [Lisensi Project](#lisensi-project)
+- [Security and Open Source Checklist](#security-and-open-source-checklist)
+- [Open Source Dependency Licenses](#open-source-dependency-licenses)
+- [Project License](#project-license)
 
-## Fitur Utama
+## Features
 
-- Autentikasi pengguna wisatawan dengan Google ID token.
-- Autentikasi admin dan perawat dengan email/password.
-- JWT access token berdurasi 15 menit dan refresh token berdurasi 30 hari.
-- Rotasi refresh token dan deteksi reuse token.
-- RBAC untuk role `traveler`, `nurse`, dan `admin`.
-- Profil kesehatan wisatawan.
-- Profil traveler dan kontak darurat.
-- Riwayat vaksinasi.
-- Asesmen kesehatan wisatawan dengan integrasi sistem pakar.
-- Sistem pakar Forward Chaining + Certainty Factor.
-- Knowledge base gejala, penyakit, dan rule yang bisa dikelola admin.
-- Kategori diagnosis `pre_travel` dan `post_travel`.
-- Klasifikasi lokasi Bali berdasarkan koordinat.
-- Daftar destinasi, risiko kesehatan daerah, fasilitas kesehatan, dan fasilitas terdekat.
-- Panduan emergency guide berbasis langkah dan decision-tree flow.
-- Manajemen perawat dan nursing care record.
-- Web admin untuk dashboard, knowledge base, fasilitas, destinasi, panduan darurat, perawat, dan asesmen.
-- Dockerfile untuk setiap service dan Docker Compose untuk stack lokal.
+- Google ID token authentication for traveler users.
+- Email/password authentication for admin and nurse users.
+- JWT access tokens with a 15-minute lifetime.
+- Refresh tokens with a 30-day lifetime.
+- Refresh token rotation and token reuse detection.
+- Role-based access control for `traveler`, `nurse`, and `admin`.
+- Traveler health profile management.
+- Traveler profile and emergency contact management.
+- Vaccination record management.
+- Health assessment submission and history.
+- Python expert-system integration for diagnosis support.
+- Forward Chaining and Certainty Factor inference.
+- Admin-managed knowledge base for symptoms, diseases, and expert rules.
+- `pre_travel` and `post_travel` diagnosis categories.
+- Bali location classification based on latitude and longitude.
+- Destination, regional health risk, and nearby medical facility APIs.
+- Step-based emergency guides.
+- Decision-tree emergency guide flows.
+- Nurse management and nursing care records.
+- Web admin dashboard for assessments, facilities, destinations, emergency guides, nurses, and expert knowledge base data.
+- Dockerfile for each service.
+- Docker Compose stack for local development.
 
-## Arsitektur
+## Architecture
 
 ```text
-Client Mobile / Web Admin
+Mobile Client / Web Admin
         |
         v
 Go API Gateway (Gin) :8080
@@ -55,43 +61,43 @@ Go API Gateway (Gin) :8080
         |
         |-- Python Expert Service (FastAPI) :8001
                 |
-                |-- membaca published rules dari PostgreSQL
+                |-- reads published expert rules from PostgreSQL
 ```
 
-Alur diagnosis:
+Diagnosis flow:
 
-1. Client mengirim gejala ke `POST /assessment`.
-2. Gateway membaca profil kesehatan user dari database.
-3. Gateway meneruskan gejala, kategori, dan profil user ke `expert-py`.
-4. Expert service memuat rule berstatus `published` dari PostgreSQL.
-5. Engine mencocokkan premis rule dengan gejala input menggunakan Forward Chaining.
-6. Engine menghitung Certainty Factor, mengurutkan kandidat diagnosis, lalu menentukan level risiko.
-7. Gateway menyimpan hasil ke tabel `health_assessments`.
+1. The client submits symptoms to `POST /assessment`.
+2. The Go gateway loads the authenticated user's health profile from PostgreSQL.
+3. The gateway forwards symptoms, diagnosis category, and optional user profile data to the Python expert service.
+4. The expert service loads `published` rules from PostgreSQL.
+5. The inference engine matches rule premises against the submitted symptoms using Forward Chaining.
+6. The engine calculates Certainty Factor scores, ranks diagnosis candidates, and maps the top result to a risk level.
+7. The gateway stores the final assessment result in `health_assessments`.
 
-## Struktur Repository
+## Repository Structure
 
 ```text
 .
 |-- gateway-go/
-|   |-- cmd/server/main.go          # entrypoint API gateway
-|   |-- internal/database/          # koneksi PostgreSQL
+|   |-- cmd/server/main.go          # API gateway entrypoint
+|   |-- internal/database/          # PostgreSQL connection
 |   |-- internal/handlers/          # HTTP handlers
 |   |-- internal/middleware/        # auth, CORS, RBAC
-|   |-- internal/models/            # model response/domain
-|   |-- internal/repository/        # query PostgreSQL
+|   |-- internal/models/            # response and domain models
+|   |-- internal/repository/        # PostgreSQL queries
 |   |-- internal/services/          # business logic
-|   |-- migrations/                 # 25 file migrasi SQL
+|   |-- migrations/                 # SQL migrations
 |   |-- Dockerfile
 |   |-- go.mod
 |   `-- go.sum
 |
 |-- expert-py/
-|   |-- main.py                     # entrypoint FastAPI
-|   |-- app/database.py             # koneksi PostgreSQL
-|   |-- app/input_layer/            # Pydantic schema
-|   |-- app/knowledge_base/         # loader rule dari database
-|   |-- app/logic_engine/           # Forward Chaining + CF
-|   |-- app/output_layer/           # risk classifier + rekomendasi
+|   |-- main.py                     # FastAPI entrypoint
+|   |-- app/database.py             # PostgreSQL connection
+|   |-- app/input_layer/            # Pydantic schemas
+|   |-- app/knowledge_base/         # rule loader
+|   |-- app/logic_engine/           # Forward Chaining and CF logic
+|   |-- app/output_layer/           # risk classifier and recommendations
 |   |-- tests/
 |   |-- requirements.txt
 |   `-- Dockerfile
@@ -99,7 +105,7 @@ Alur diagnosis:
 |-- web-admin/
 |   |-- app/                        # Next.js app router
 |   |-- components/
-|   |-- lib/api.ts                  # API client ke gateway
+|   |-- lib/api.ts                  # API client for the gateway
 |   |-- package.json
 |   |-- package-lock.json
 |   `-- Dockerfile
@@ -110,39 +116,39 @@ Alur diagnosis:
 
 ## Requirements
 
-### Untuk Docker
+### Docker Setup
 
 - Docker Engine
 - Docker Compose
 
-Image yang digunakan:
+Docker images used by the stack:
 
 - `postgres:16-alpine`
-- `golang:1.25.10-alpine3.23` untuk build gateway
-- `python:3.12-slim` untuk expert service
-- `node:22-alpine` untuk web admin
+- `golang:1.25.10-alpine3.23` for the gateway build stage
+- `python:3.12-slim` for the expert service
+- `node:22-alpine` for the admin dashboard
 
-### Untuk menjalankan lokal tanpa Docker
+### Local Setup Without Docker
 
 - Go 1.25+
 - Python 3.12+
 - Node.js 22+
 - npm
 - PostgreSQL 16+
-- Tool migrasi database. Direkomendasikan `golang-migrate`, tetapi file SQL juga bisa dijalankan manual dengan `psql`.
+- A database migration tool. `golang-migrate` is recommended, but the SQL files can also be applied manually with `psql`.
 
-### Dependency utama
+### Main Dependencies
 
-Gateway Go:
+Go gateway:
 
 - Gin HTTP framework
 - gin-contrib/cors
 - pgx PostgreSQL driver
 - golang-jwt/jwt
 - Google API ID token validator
-- bcrypt dari `golang.org/x/crypto`
+- bcrypt from `golang.org/x/crypto`
 
-Expert Python:
+Python expert service:
 
 - FastAPI
 - Uvicorn
@@ -158,9 +164,9 @@ Web admin:
 - Tailwind CSS
 - TypeScript
 
-## Konfigurasi Environment
+## Environment Configuration
 
-Buat file `.env` di `infra/docker/.env` untuk Docker Compose.
+Create `infra/docker/.env` for Docker Compose.
 
 ```env
 POSTGRES_USER=balitravelhealthdb
@@ -174,55 +180,55 @@ GOOGLE_OAUTH_CLIENT_IDS=your-google-client-id.apps.googleusercontent.com
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 ```
 
-Variable yang dikenali gateway:
+Gateway environment variables:
 
-| Variable | Wajib | Default | Keterangan |
+| Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `DB_HOST` | Ya | - | Host PostgreSQL. Di Compose: `db`. |
-| `DB_PORT` | Ya | - | Port PostgreSQL. Umumnya `5432`. |
-| `POSTGRES_USER` | Ya | - | Username database. |
-| `POSTGRES_PASSWORD` | Ya | - | Password database. |
-| `POSTGRES_DB` | Ya | - | Nama database. |
-| `JWT_SECRET` | Ya | - | Secret HS256 untuk access token. Gunakan string panjang dan acak. |
-| `GOOGLE_OAUTH_CLIENT_IDS` | Ya untuk login Google | - | Satu atau beberapa Google OAuth client ID, dipisah koma. |
-| `EXPERT_SERVICE_URL` | Ya | - | URL service expert. Di Compose: `http://expert:8001`. |
-| `PORT` | Tidak | `8080` | Port gateway. |
-| `GIN_MODE` | Tidak | `debug` | Gunakan `release` di produksi. |
-| `CORS_ALLOWED_ORIGINS` | Tidak | `*` | Origin yang diizinkan, dipisah koma. Jika dipakai di Compose, tambahkan variable ini ke environment service gateway. |
+| `DB_HOST` | Yes | - | PostgreSQL host. In Docker Compose: `db`. |
+| `DB_PORT` | Yes | - | PostgreSQL port, usually `5432`. |
+| `POSTGRES_USER` | Yes | - | Database username. |
+| `POSTGRES_PASSWORD` | Yes | - | Database password. |
+| `POSTGRES_DB` | Yes | - | Database name. |
+| `JWT_SECRET` | Yes | - | HS256 secret for access tokens. Use a long random value. |
+| `GOOGLE_OAUTH_CLIENT_IDS` | Required for Google login | - | One or more Google OAuth client IDs, separated by commas. |
+| `EXPERT_SERVICE_URL` | Yes | - | Expert service URL. In Docker Compose: `http://expert:8001`. |
+| `PORT` | No | `8080` | Gateway HTTP port. |
+| `GIN_MODE` | No | `debug` | Use `release` in production. |
+| `CORS_ALLOWED_ORIGINS` | No | `*` | Comma-separated allowed origins. If needed in Docker Compose, add it to the gateway service environment. |
 
-Variable expert service:
+Expert service environment variables:
 
-| Variable | Wajib | Default di kode | Keterangan |
+| Variable | Required | Code Default | Description |
 | --- | --- | --- | --- |
-| `DB_HOST` | Tidak | `db` | Host PostgreSQL. |
-| `DB_PORT` | Tidak | `5432` | Port PostgreSQL. |
-| `POSTGRES_DB` | Tidak | `balitravelhealth` | Nama database. |
-| `POSTGRES_USER` | Tidak | `balitravelhealthdb` | Username database. |
-| `POSTGRES_PASSWORD` | Ya | kosong | Password database. |
+| `DB_HOST` | No | `db` | PostgreSQL host. |
+| `DB_PORT` | No | `5432` | PostgreSQL port. |
+| `POSTGRES_DB` | No | `balitravelhealth` | Database name. |
+| `POSTGRES_USER` | No | `balitravelhealthdb` | Database username. |
+| `POSTGRES_PASSWORD` | Yes | empty | Database password. |
 
-Variable web admin:
+Web admin environment variables:
 
-| Variable | Wajib | Default | Keterangan |
+| Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | Tidak | `http://localhost:8080` | Base URL gateway yang dipanggil browser. |
+| `NEXT_PUBLIC_API_BASE_URL` | No | `http://localhost:8080` | Gateway base URL used by the browser. |
 
-## Menjalankan dengan Docker Compose
+## Running with Docker Compose
 
-1. Masuk ke folder Compose:
+1. Open the Docker Compose directory:
 
 ```bash
 cd infra/docker
 ```
 
-2. Buat file environment `.env` dengan isi pada bagian [Konfigurasi Environment](#konfigurasi-environment).
+2. Create `.env` using the values from [Environment Configuration](#environment-configuration).
 
-3. Jalankan stack:
+3. Start the stack:
 
 ```bash
 docker compose --env-file .env up -d --build
 ```
 
-4. Jalankan migrasi database:
+4. Run database migrations:
 
 ```bash
 migrate -path ../../gateway-go/migrations \
@@ -230,24 +236,24 @@ migrate -path ../../gateway-go/migrations \
   up
 ```
 
-5. Cek service:
+5. Check the services:
 
 ```bash
 curl http://localhost:8080/health
 docker compose exec expert python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8001/health').read().decode())"
 ```
 
-Catatan:
+Notes:
 
-- Pada `docker-compose.yml` saat ini, port gateway `8080`, PostgreSQL `5432`, dan web admin `3000` dipublish hanya ke `127.0.0.1`.
-- Expert service tidak dipublish ke host oleh Compose. Service ini diakses internal oleh gateway melalui `http://expert:8001`.
-- Web admin tersedia di `http://localhost:3000`.
+- In the current `docker-compose.yml`, the gateway `8080`, PostgreSQL `5432`, and web admin `3000` ports are published only to `127.0.0.1`.
+- The expert service is not published to the host by default. It is accessed internally by the gateway through `http://expert:8001`.
+- The web admin dashboard is available at `http://localhost:3000`.
 
-## Menjalankan Secara Lokal
+## Running Locally
 
-### 1. Siapkan PostgreSQL
+### 1. Prepare PostgreSQL
 
-Buat database:
+Create the database and user:
 
 ```sql
 CREATE DATABASE balitravelhealth;
@@ -255,9 +261,9 @@ CREATE USER balitravelhealthdb WITH PASSWORD 'change_this_password';
 GRANT ALL PRIVILEGES ON DATABASE balitravelhealth TO balitravelhealthdb;
 ```
 
-Lalu jalankan semua migrasi pada folder `gateway-go/migrations`.
+Then apply all migrations in `gateway-go/migrations`.
 
-### 2. Jalankan expert service
+### 2. Run the Expert Service
 
 ```bash
 cd expert-py
@@ -274,7 +280,7 @@ export POSTGRES_DB=balitravelhealth
 uvicorn main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-Untuk PowerShell:
+PowerShell:
 
 ```powershell
 cd expert-py
@@ -291,7 +297,7 @@ $env:POSTGRES_DB="balitravelhealth"
 uvicorn main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-### 3. Jalankan gateway Go
+### 3. Run the Go Gateway
 
 ```bash
 cd gateway-go
@@ -309,7 +315,7 @@ export EXPERT_SERVICE_URL=http://localhost:8001
 go run ./cmd/server
 ```
 
-Untuk PowerShell:
+PowerShell:
 
 ```powershell
 cd gateway-go
@@ -327,7 +333,7 @@ $env:EXPERT_SERVICE_URL="http://localhost:8001"
 go run ./cmd/server
 ```
 
-### 4. Jalankan web admin
+### 4. Run the Web Admin
 
 ```bash
 cd web-admin
@@ -335,7 +341,7 @@ npm install
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 npm run dev
 ```
 
-Untuk PowerShell:
+PowerShell:
 
 ```powershell
 cd web-admin
@@ -344,32 +350,32 @@ $env:NEXT_PUBLIC_API_BASE_URL="http://localhost:8080"
 npm run dev
 ```
 
-## Migrasi Database
+## Database Migrations
 
-Folder `gateway-go/migrations` berisi 25 migrasi `up` dan `down`.
+The `gateway-go/migrations` directory contains 25 `up` and `down` migrations.
 
-Isi migrasi mencakup:
+The migrations cover:
 
-- User dan auth provider.
-- Profil kesehatan.
-- Asesmen kesehatan.
-- Refresh token.
-- Role, permission, user role, dan role permission.
-- Traveler.
-- Nurse.
-- Nursing care record.
-- Vaccination record.
-- Destinasi Bali.
-- Fasilitas kesehatan.
-- AOI location.
-- Health risk.
-- Emergency guide dan emergency guide flow.
+- Users and authentication provider enum.
+- Health profiles.
+- Health assessments.
+- Refresh tokens.
+- Roles, permissions, user roles, and role permissions.
+- Traveler profiles.
+- Nurse profiles.
+- Nursing care records.
+- Vaccination records.
+- Bali destinations.
+- Medical facilities.
+- AOI locations.
+- Health risks.
+- Emergency guides and emergency guide flows.
 - Expert symptoms.
 - Expert diseases.
 - Expert rules.
-- Seed data awal, knowledge base, emergency guide, dan SOP knowledge base.
+- Initial seed data, expert knowledge base, emergency guide data, and SOP knowledge base data.
 
-Dengan `golang-migrate`:
+Using `golang-migrate`:
 
 ```bash
 migrate -path gateway-go/migrations \
@@ -377,7 +383,7 @@ migrate -path gateway-go/migrations \
   up
 ```
 
-Rollback satu langkah:
+Rollback one migration:
 
 ```bash
 migrate -path gateway-go/migrations \
@@ -385,13 +391,13 @@ migrate -path gateway-go/migrations \
   down 1
 ```
 
-Jika tidak memakai tool migrasi, jalankan file `*.up.sql` secara berurutan berdasarkan nama file.
+If you do not use a migration tool, apply all `*.up.sql` files manually in filename order.
 
-## API Endpoint
+## API Endpoints
 
-Base URL gateway default: `http://localhost:8080`.
+Default gateway base URL: `http://localhost:8080`.
 
-Endpoint protected membutuhkan header:
+Protected endpoints require:
 
 ```http
 Authorization: Bearer <access_token>
@@ -399,58 +405,58 @@ Authorization: Bearer <access_token>
 
 ### Health
 
-| Method | Endpoint | Auth | Keterangan |
+| Method | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
-| GET | `/health` | Tidak | Health check gateway dan koneksi database. |
-| GET | `/uploads/*` | Tidak | Static file hasil upload admin. |
+| GET | `/health` | No | Gateway and database health check. |
+| GET | `/uploads/*` | No | Static files uploaded from admin. |
 
 ### Auth
 
 | Method | Endpoint | Auth | Body |
 | --- | --- | --- | --- |
-| POST | `/auth/google` | Tidak | `{ "id_token": "...", "device_info": "Android" }` |
-| POST | `/auth/refresh` | Tidak | `{ "refresh_token": "...", "device_info": "Android" }` |
-| POST | `/auth/logout` | Tidak | `{ "refresh_token": "..." }` |
-| POST | `/admin/auth/login` | Tidak | `{ "email": "...", "password": "...", "device_info": "browser" }` |
-| POST | `/admin/bootstrap` | Tidak | `{ "email": "...", "password": "min-8-char" }` |
+| POST | `/auth/google` | No | `{ "id_token": "...", "device_info": "Android" }` |
+| POST | `/auth/refresh` | No | `{ "refresh_token": "...", "device_info": "Android" }` |
+| POST | `/auth/logout` | No | `{ "refresh_token": "..." }` |
+| POST | `/admin/auth/login` | No | `{ "email": "...", "password": "...", "device_info": "browser" }` |
+| POST | `/admin/bootstrap` | No | `{ "email": "...", "password": "min-8-char" }` |
 
-`/admin/bootstrap` hanya berhasil jika belum ada admin di database.
+`/admin/bootstrap` only succeeds when no admin account exists yet.
 
 ### Public Content
 
-| Method | Endpoint | Keterangan |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/location/classify?lat=-8.65&lng=115.21` | Cek apakah koordinat berada di Bali dan region perkiraan. |
-| GET | `/facilities/nearby?lat=-8.65&lng=115.21&radius_km=20&limit=10` | Fasilitas kesehatan terdekat. |
-| GET | `/destinations` | Daftar destinasi/kabupaten/kota. |
-| GET | `/destinations/:id/health-risks` | Risiko kesehatan per destinasi. |
-| GET | `/emergency-guides` | Panduan emergency berbasis langkah. |
-| GET | `/emergency-guide-flows` | Daftar panduan emergency decision-tree. |
-| GET | `/emergency-guide-flows/:id` | Detail panduan emergency decision-tree. |
-| GET | `/expert/symptoms?kategori=pre_travel` | Daftar gejala publik untuk kategori tertentu. |
+| GET | `/location/classify?lat=-8.65&lng=115.21` | Checks whether the coordinates are inside Bali and returns an approximate region. |
+| GET | `/facilities/nearby?lat=-8.65&lng=115.21&radius_km=20&limit=10` | Returns nearby medical facilities. |
+| GET | `/destinations` | Lists destinations or Bali regions. |
+| GET | `/destinations/:id/health-risks` | Lists health risks for a destination. |
+| GET | `/emergency-guides` | Lists step-based emergency guides. |
+| GET | `/emergency-guide-flows` | Lists decision-tree emergency guides. |
+| GET | `/emergency-guide-flows/:id` | Returns one decision-tree emergency guide. |
+| GET | `/expert/symptoms?kategori=pre_travel` | Lists public symptoms for a diagnosis category. |
 
-### Traveler Protected
+### Traveler Protected Endpoints
 
-| Method | Endpoint | Keterangan |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/health-profile` | Ambil profil kesehatan user. |
-| POST | `/health-profile` | Buat profil kesehatan. |
-| PUT | `/health-profile` | Update profil kesehatan. |
-| GET | `/traveler-profile` | Ambil profil traveler. |
-| POST | `/traveler-profile` | Buat profil traveler. |
-| PUT | `/traveler-profile` | Update profil traveler. |
-| POST | `/assessment` | Submit gejala dan jalankan diagnosis. |
-| GET | `/assessments?page=1&limit=10` | Riwayat asesmen user. |
-| GET | `/vaccinations` | Riwayat vaksin user. |
-| POST | `/vaccinations` | Tambah riwayat vaksin. |
-| DELETE | `/vaccinations/:id` | Hapus riwayat vaksin. |
-| GET | `/nurses` | Daftar perawat aktif. |
-| POST | `/nursing/appointments` | Buat appointment perawat. |
-| GET | `/nursing/my-records` | Riwayat nursing care milik traveler. |
-| GET | `/nursing/nurse-records` | Record yang ditugaskan ke perawat login. |
-| PUT | `/nursing/records/:id` | Update nursing care record oleh perawat terkait. |
+| GET | `/health-profile` | Get the authenticated user's health profile. |
+| POST | `/health-profile` | Create a health profile. |
+| PUT | `/health-profile` | Update a health profile. |
+| GET | `/traveler-profile` | Get the traveler profile. |
+| POST | `/traveler-profile` | Create a traveler profile. |
+| PUT | `/traveler-profile` | Update a traveler profile. |
+| POST | `/assessment` | Submit symptoms and run diagnosis. |
+| GET | `/assessments?page=1&limit=10` | List the authenticated user's assessment history. |
+| GET | `/vaccinations` | List vaccination records. |
+| POST | `/vaccinations` | Create a vaccination record. |
+| DELETE | `/vaccinations/:id` | Delete a vaccination record. |
+| GET | `/nurses` | List active nurses. |
+| POST | `/nursing/appointments` | Create a nurse appointment. |
+| GET | `/nursing/my-records` | List the traveler's own nursing care records. |
+| GET | `/nursing/nurse-records` | List records assigned to the logged-in nurse. |
+| PUT | `/nursing/records/:id` | Update a nursing care record assigned to the logged-in nurse. |
 
-Contoh submit assessment:
+Example assessment request:
 
 ```bash
 curl -X POST http://localhost:8080/assessment \
@@ -462,50 +468,50 @@ curl -X POST http://localhost:8080/assessment \
   }'
 ```
 
-### Admin Protected
+### Admin Protected Endpoints
 
-Endpoint `/admin/*` membutuhkan user dengan role `admin` atau `nurse`, kecuali operasi tertentu dibatasi secara service logic.
+`/admin/*` endpoints require a user with the `admin` or `nurse` role, except where service-level business rules further restrict behavior.
 
-| Method | Endpoint | Keterangan |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| POST | `/admin/upload` | Upload gambar, mengembalikan URL `/uploads/...`. |
-| GET | `/admin/facilities` | List fasilitas. |
-| POST | `/admin/facilities` | Buat fasilitas. |
-| PUT | `/admin/facilities/:id` | Update fasilitas. |
-| DELETE | `/admin/facilities/:id` | Hapus fasilitas. |
-| POST | `/admin/destinations` | Buat destinasi. |
-| PUT | `/admin/destinations/:id` | Update destinasi. |
-| DELETE | `/admin/destinations/:id` | Hapus destinasi. |
-| POST | `/admin/health-risks` | Buat risiko kesehatan. |
-| PUT | `/admin/health-risks/:id` | Update risiko kesehatan. |
-| DELETE | `/admin/health-risks/:id` | Hapus risiko kesehatan. |
-| POST | `/admin/emergency-guides` | Buat emergency guide langkah. |
-| PUT | `/admin/emergency-guides/:id` | Update emergency guide langkah. |
-| DELETE | `/admin/emergency-guides/:id` | Hapus emergency guide langkah. |
-| GET | `/admin/emergency-guide-flows` | List emergency flow untuk admin. |
-| POST | `/admin/emergency-guide-flows` | Buat emergency flow. |
-| PUT | `/admin/emergency-guide-flows/:id` | Update emergency flow. |
-| DELETE | `/admin/emergency-guide-flows/:id` | Hapus emergency flow. |
-| GET | `/admin/nurses` | List semua perawat. |
-| POST | `/admin/nurses` | Buat akun perawat. |
-| PUT | `/admin/nurses/:id/toggle` | Aktif/nonaktifkan perawat. |
-| GET | `/admin/assessments?page=1&limit=20` | List semua asesmen. |
-| GET | `/admin/expert/symptoms` | List gejala master. |
-| POST | `/admin/expert/symptoms` | Buat gejala master. |
-| PUT | `/admin/expert/symptoms/:id` | Update gejala master. |
-| DELETE | `/admin/expert/symptoms/:id` | Hapus gejala master. |
-| GET | `/admin/expert/diseases` | List penyakit master. |
-| POST | `/admin/expert/diseases` | Buat penyakit master. |
-| PUT | `/admin/expert/diseases/:id` | Update penyakit master. |
-| DELETE | `/admin/expert/diseases/:id` | Hapus penyakit master. |
-| GET | `/admin/expert/rules` | List rule sistem pakar. |
-| POST | `/admin/expert/rules` | Buat rule draft. |
-| PUT | `/admin/expert/rules/:id` | Update rule. |
-| DELETE | `/admin/expert/rules/:id` | Hapus rule. |
-| POST | `/admin/expert/rules/:id/publish` | Publish rule. |
-| POST | `/admin/expert/rules/:id/unpublish` | Unpublish rule. |
+| POST | `/admin/upload` | Upload an image and return an `/uploads/...` URL. |
+| GET | `/admin/facilities` | List medical facilities. |
+| POST | `/admin/facilities` | Create a medical facility. |
+| PUT | `/admin/facilities/:id` | Update a medical facility. |
+| DELETE | `/admin/facilities/:id` | Delete a medical facility. |
+| POST | `/admin/destinations` | Create a destination. |
+| PUT | `/admin/destinations/:id` | Update a destination. |
+| DELETE | `/admin/destinations/:id` | Delete a destination. |
+| POST | `/admin/health-risks` | Create a health risk. |
+| PUT | `/admin/health-risks/:id` | Update a health risk. |
+| DELETE | `/admin/health-risks/:id` | Delete a health risk. |
+| POST | `/admin/emergency-guides` | Create a step-based emergency guide. |
+| PUT | `/admin/emergency-guides/:id` | Update a step-based emergency guide. |
+| DELETE | `/admin/emergency-guides/:id` | Delete a step-based emergency guide. |
+| GET | `/admin/emergency-guide-flows` | List emergency guide flows for admin. |
+| POST | `/admin/emergency-guide-flows` | Create an emergency guide flow. |
+| PUT | `/admin/emergency-guide-flows/:id` | Update an emergency guide flow. |
+| DELETE | `/admin/emergency-guide-flows/:id` | Delete an emergency guide flow. |
+| GET | `/admin/nurses` | List all nurses. |
+| POST | `/admin/nurses` | Create a nurse account. |
+| PUT | `/admin/nurses/:id/toggle` | Activate or deactivate a nurse. |
+| GET | `/admin/assessments?page=1&limit=20` | List all assessments. |
+| GET | `/admin/expert/symptoms` | List master symptoms. |
+| POST | `/admin/expert/symptoms` | Create a master symptom. |
+| PUT | `/admin/expert/symptoms/:id` | Update a master symptom. |
+| DELETE | `/admin/expert/symptoms/:id` | Delete a master symptom. |
+| GET | `/admin/expert/diseases` | List master diseases. |
+| POST | `/admin/expert/diseases` | Create a master disease. |
+| PUT | `/admin/expert/diseases/:id` | Update a master disease. |
+| DELETE | `/admin/expert/diseases/:id` | Delete a master disease. |
+| GET | `/admin/expert/rules` | List expert-system rules. |
+| POST | `/admin/expert/rules` | Create a draft rule. |
+| PUT | `/admin/expert/rules/:id` | Update a rule. |
+| DELETE | `/admin/expert/rules/:id` | Delete a rule. |
+| POST | `/admin/expert/rules/:id/publish` | Publish a rule. |
+| POST | `/admin/expert/rules/:id/unpublish` | Unpublish a rule. |
 
-Contoh bootstrap admin:
+Bootstrap the first admin:
 
 ```bash
 curl -X POST http://localhost:8080/admin/bootstrap \
@@ -516,7 +522,7 @@ curl -X POST http://localhost:8080/admin/bootstrap \
   }'
 ```
 
-Contoh login admin:
+Admin login:
 
 ```bash
 curl -X POST http://localhost:8080/admin/auth/login \
@@ -528,19 +534,19 @@ curl -X POST http://localhost:8080/admin/auth/login \
   }'
 ```
 
-## Sistem Pakar
+## Expert System
 
-Expert service tersedia di `expert-py`.
+The expert service is located in `expert-py`.
 
-Endpoint:
+Endpoints:
 
-| Method | Endpoint | Keterangan |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/health` | Health check sederhana. |
-| GET | `/health/db` | Health check plus cek rule published di database. |
-| POST | `/diagnose` | Diagnosis berdasarkan gejala dan profil user. |
+| GET | `/health` | Basic health check. |
+| GET | `/health/db` | Health check with database/rule loading verification. |
+| POST | `/diagnose` | Diagnose based on symptoms and optional user profile. |
 
-Request `/diagnose`:
+`/diagnose` request:
 
 ```json
 {
@@ -558,36 +564,36 @@ Response:
 
 ```json
 {
-  "diagnosis": "Nama diagnosis teratas",
+  "diagnosis": "Top diagnosis name",
   "confidence_score": 0.88,
   "risk_level": "Darurat",
-  "recommendation": "Rekomendasi tindakan",
+  "recommendation": "Recommended action",
   "all_results": [
     {
       "disease_id": 1,
-      "disease_nama": "Nama penyakit",
+      "disease_nama": "Disease name",
       "confidence_score": 0.88,
       "risk_level": "Darurat",
-      "recommendation": "Rekomendasi tindakan"
+      "recommendation": "Recommended action"
     }
   ]
 }
 ```
 
-Logika inti:
+Core logic:
 
-- Rule hanya digunakan jika `status = 'published'`.
-- Rule dapat difilter dengan kategori `pre_travel` atau `post_travel`.
-- Forward Chaining mencocokkan seluruh `premis` rule terhadap gejala input.
-- CF satu rule dihitung dengan `MB - MD`.
-- Beberapa rule untuk penyakit yang sama digabung dengan:
+- Only rules with `status = 'published'` are used.
+- Rules can be filtered by `pre_travel` or `post_travel`.
+- Forward Chaining matches the entire rule `premis` against input symptoms.
+- A single rule CF is calculated as `MB - MD`.
+- Multiple matching rules for the same disease are combined with:
 
 ```text
 CFcombine = CFold + CFnew * (1 - CFold)
 ```
 
-- User profile dapat menaikkan skor untuk risiko tertentu, misalnya usia `>= 60` pada diagnosis terkait kardiovaskular/heat-related.
-- Mapping risk level:
+- User profile data can boost risk scores for selected conditions, for example age `>= 60` for cardiovascular or heat-related diagnoses.
+- Risk level mapping. The API currently returns risk labels in Indonesian because these values are part of the stored domain model:
 
 | CF | Risk Level |
 | --- | --- |
@@ -596,102 +602,102 @@ CFcombine = CFold + CFnew * (1 - CFold)
 | `>= 0.4` | `Sedang` |
 | `< 0.4` | `Rendah` |
 
-## Skema Database
+## Database Schema
 
-Tabel utama:
+Main tables:
 
-| Tabel | Fungsi |
+| Table | Purpose |
 | --- | --- |
-| `users` | Akun user, admin, dan perawat. |
-| `refresh_tokens` | Refresh token yang disimpan sebagai hash. |
-| `roles` | Role `traveler`, `nurse`, `admin`. |
-| `permissions` | Master permission. |
-| `user_roles` | Relasi user ke role. |
-| `role_permissions` | Relasi role ke permission. |
-| `health_profiles` | Profil kesehatan user. |
-| `travelers` | Profil traveler. |
-| `health_assessments` | Riwayat asesmen dan hasil diagnosis. |
-| `vaccination_records` | Riwayat vaksinasi. |
-| `nurses` | Profil perawat. |
-| `nursing_care_records` | Catatan layanan keperawatan. |
-| `destinations` | Daftar daerah/destinasi Bali. |
-| `medical_facilities` | Fasilitas kesehatan. |
-| `aoi_locations` | Area of interest lokasi. |
-| `health_risks` | Risiko kesehatan per destinasi. |
-| `emergency_guides` | Panduan emergency berbasis langkah. |
-| `emergency_guide_flows` | Panduan emergency berbasis decision-tree JSON. |
-| `expert_symptoms` | Master gejala sistem pakar. |
-| `expert_diseases` | Master penyakit/diagnosis. |
-| `expert_rules` | Rule IF-THEN + Certainty Factor. |
+| `users` | Accounts for travelers, admins, and nurses. |
+| `refresh_tokens` | Refresh tokens stored as hashes. |
+| `roles` | Role master table: `traveler`, `nurse`, `admin`. |
+| `permissions` | Permission master table. |
+| `user_roles` | User-to-role relation. |
+| `role_permissions` | Role-to-permission relation. |
+| `health_profiles` | User health profile data. |
+| `travelers` | Traveler profile data. |
+| `health_assessments` | Assessment history and diagnosis results. |
+| `vaccination_records` | Vaccination history. |
+| `nurses` | Nurse profiles. |
+| `nursing_care_records` | Nursing care records. |
+| `destinations` | Bali destination/region list. |
+| `medical_facilities` | Medical facility data. |
+| `aoi_locations` | Area of interest location data. |
+| `health_risks` | Destination-specific health risks. |
+| `emergency_guides` | Step-based emergency guides. |
+| `emergency_guide_flows` | JSON decision-tree emergency guides. |
+| `expert_symptoms` | Expert-system symptom master data. |
+| `expert_diseases` | Expert-system disease/diagnosis master data. |
+| `expert_rules` | IF-THEN rules with Certainty Factor values. |
 
-Seed data mencakup:
+Seed data includes:
 
-- Role awal: `traveler`, `nurse`, `admin`.
-- 9 kabupaten/kota di Bali.
-- Contoh fasilitas kesehatan di Bali.
-- Knowledge base gejala, penyakit, dan rule.
-- Emergency guide dan emergency guide flow.
-- SOP knowledge base tambahan.
+- Initial roles: `traveler`, `nurse`, and `admin`.
+- 9 Bali regencies/cities.
+- Sample medical facilities in Bali.
+- Expert-system symptoms, diseases, and rules.
+- Emergency guides and emergency guide flows.
+- Additional SOP knowledge base data.
 
 ## Testing
 
-### Expert service
+### Expert Service
 
 ```bash
 cd expert-py
 pytest
 ```
 
-Test yang tersedia mengecek:
+Existing tests cover:
 
-- Rumus CF.
-- Kombinasi CF.
+- CF formula.
+- CF combination.
 - Forward Chaining symptom matcher.
-- Agregasi CF per penyakit.
-- Klasifikasi level risiko.
+- CF aggregation by disease.
+- Risk level classification.
 
-### Gateway Go
+### Go Gateway
 
 ```bash
 cd gateway-go
 go test ./...
 ```
 
-Catatan:
+Notes:
 
-- Beberapa test gateway bersifat integration test dan membutuhkan PostgreSQL yang sudah hidup serta sudah dimigrasi.
-- Jika database tidak tersedia, test RBAC akan melakukan skip.
-- Pastikan environment database dan `JWT_SECRET` tersedia saat menjalankan test penuh.
+- Some gateway tests are integration tests and require PostgreSQL to be running with migrations applied.
+- If the database is unavailable, RBAC tests are skipped.
+- Make sure database environment variables and `JWT_SECRET` are available when running the full test suite.
 
-### Web admin
+### Web Admin
 
 ```bash
 cd web-admin
 npm run build
 ```
 
-Script `npm run lint` tersedia di `package.json`, tetapi pastikan konfigurasi lint Next.js sesuai versi Next.js yang digunakan.
+The `npm run lint` script exists in `package.json`, but verify the lint setup against the Next.js version used by this project.
 
-## Keamanan dan Checklist Open Source
+## Security and Open Source Checklist
 
-Sebelum repository dipublish:
+Before publishing this repository:
 
-- Tambahkan file `LICENSE` untuk lisensi project sendiri.
-- Jangan commit file `.env`, private key, service account, OAuth secret, atau credential lain.
-- Ganti semua contoh password dan secret.
-- Gunakan `JWT_SECRET` panjang, acak, dan berbeda per environment.
-- Set `GIN_MODE=release` di production.
-- Batasi CORS dengan `CORS_ALLOWED_ORIGINS`, jangan gunakan wildcard untuk production.
-- Jalankan gateway di belakang HTTPS/reverse proxy.
-- Review ulang seed data dan konten medis sebelum publik.
-- Tambahkan privacy policy dan data retention policy karena project memproses data kesehatan.
-- Backup database secara berkala.
-- Gunakan akun database dengan privilege minimum untuk production.
-- Pertimbangkan rate limiting untuk endpoint auth dan assessment.
-- Tambahkan observability production: structured logging, metrics, dan alerting.
-- Jalankan audit dependency dan vulnerability scan sebelum release.
+- Add a `LICENSE` file for the project itself.
+- Do not commit `.env`, private keys, service accounts, OAuth secrets, or production credentials.
+- Replace all example passwords and secrets.
+- Use a long, random, environment-specific `JWT_SECRET`.
+- Set `GIN_MODE=release` in production.
+- Restrict CORS with `CORS_ALLOWED_ORIGINS`; do not use wildcard CORS for production.
+- Run the gateway behind HTTPS or a trusted reverse proxy.
+- Review all seed data and medical content before public or production use.
+- Add privacy policy and data retention policy documentation because the system processes health-related data.
+- Back up the database regularly.
+- Use least-privilege database accounts in production.
+- Consider rate limiting for authentication and assessment endpoints.
+- Add production observability such as structured logs, metrics, and alerts.
+- Run dependency audits and vulnerability scans before each release.
 
-Contoh audit dependency:
+Suggested audit commands:
 
 ```bash
 # Go
@@ -708,19 +714,19 @@ npm audit
 npx license-checker --summary
 ```
 
-## Lisensi Dependency Open Source
+## Open Source Dependency Licenses
 
-> Penting: daftar di bawah disusun dari file dependency yang ada di repository. Untuk rilis resmi, jalankan audit lisensi ulang pada versi dependency final, terutama karena `expert-py/requirements.txt` belum mengunci versi package Python.
+> Important: the list below is based on the dependency files currently present in this repository. For an official release, rerun a license audit against the final locked dependency versions, especially because `expert-py/requirements.txt` does not currently pin Python package versions.
 
-### Ringkasan
+### Summary
 
-- Go gateway memakai dependency open source dengan lisensi permissive seperti MIT, BSD-3-Clause, dan Apache-2.0 pada dependency utama.
-- Python expert service memakai FastAPI/Pydantic/pytest yang permissive, Uvicorn BSD-3-Clause, dan `psycopg` yang menggunakan LGPL-3.0.
-- Web admin berdasarkan `package-lock.json` memakai mayoritas MIT, Apache-2.0, ISC, dan BSD. Transitive dependency juga memuat LGPL-3.0-or-later melalui paket `sharp/libvips`, MPL-2.0 melalui `axe-core`, serta beberapa lisensi data seperti CC-BY-4.0 dan CC0-1.0.
+- The Go gateway mainly uses permissive open source dependencies such as MIT, BSD-3-Clause, and Apache-2.0 licensed packages.
+- The Python expert service uses permissive packages such as FastAPI, Pydantic, and pytest; Uvicorn is BSD-3-Clause; `psycopg` uses LGPL-3.0.
+- The web admin, based on `package-lock.json`, is mostly MIT, Apache-2.0, ISC, and BSD licensed. Transitive dependencies also include LGPL-3.0-or-later through `sharp/libvips`, MPL-2.0 through `axe-core`, and data licenses such as CC-BY-4.0 and CC0-1.0.
 
-### Dependency utama Go
+### Main Go Dependencies
 
-| Package | Versi di `go.mod` | Lisensi umum upstream |
+| Package | Version in `go.mod` | Common upstream license |
 | --- | --- | --- |
 | `github.com/gin-gonic/gin` | `v1.12.0` | MIT |
 | `github.com/gin-contrib/cors` | `v1.7.7` | MIT |
@@ -733,25 +739,25 @@ npx license-checker --summary
 | `github.com/goccy/go-json` | `v0.10.5` | MIT |
 | `github.com/json-iterator/go` | `v1.1.12` | MIT |
 
-Catatan: `go.mod` saat ini menandai semua dependency sebagai indirect. Rapikan dengan `go mod tidy` setelah environment Go tersedia agar dependency langsung dan transitive lebih mudah diaudit.
+Note: `go.mod` currently marks all dependencies as indirect. Run `go mod tidy` once a Go toolchain is available so direct and transitive dependencies are easier to audit.
 
-### Dependency utama Python
+### Main Python Dependencies
 
-| Package | Versi | Lisensi umum upstream | Keterangan |
+| Package | Version | Common upstream license | Notes |
 | --- | --- | --- | --- |
-| `fastapi` | Tidak dipin | MIT | Framework API. |
-| `uvicorn[standard]` | Tidak dipin | BSD-3-Clause | ASGI server. |
-| `pydantic` | Tidak dipin | MIT | Validasi schema. |
-| `pytest` | Tidak dipin | MIT | Testing. |
-| `psycopg[binary]` | Tidak dipin | LGPL-3.0-only | Driver PostgreSQL. Perhatikan kewajiban lisensi saat mendistribusikan binary/container. |
+| `fastapi` | Unpinned | MIT | API framework. |
+| `uvicorn[standard]` | Unpinned | BSD-3-Clause | ASGI server. |
+| `pydantic` | Unpinned | MIT | Schema validation. |
+| `pytest` | Unpinned | MIT | Testing. |
+| `psycopg[binary]` | Unpinned | LGPL-3.0-only | PostgreSQL driver. Review license obligations when distributing binaries or containers. |
 
-Rekomendasi: pin versi Python dependency sebelum rilis, misalnya dengan `pip-tools` atau lockfile lain.
+Recommendation: pin Python dependency versions before release, for example with `pip-tools` or another lockfile workflow.
 
-### Dependency langsung Node/Web Admin
+### Direct Node/Web Admin Dependencies
 
-Berdasarkan `web-admin/package-lock.json`:
+Based on `web-admin/package-lock.json`:
 
-| Package | Versi terkunci | Lisensi |
+| Package | Locked Version | License |
 | --- | --- | --- |
 | `autoprefixer` | `10.5.0` | MIT |
 | `next` | `15.5.18` | MIT |
@@ -767,9 +773,9 @@ Berdasarkan `web-admin/package-lock.json`:
 | `tailwindcss` | `3.4.19` | MIT |
 | `typescript` | `5.9.3` | Apache-2.0 |
 
-Ringkasan lisensi transitive dari `package-lock.json`:
+Transitive license summary from `package-lock.json`:
 
-| Lisensi | Jumlah package |
+| License | Package Count |
 | --- | ---: |
 | MIT | 358 |
 | Apache-2.0 | 34 |
@@ -778,12 +784,12 @@ Ringkasan lisensi transitive dari `package-lock.json`:
 | BSD-2-Clause | 7 |
 | BSD-3-Clause | 3 |
 | Apache-2.0 AND LGPL-3.0-or-later | 3 |
-| Tidak mendeklarasikan lisensi di lockfile | 2 |
-| Lainnya | 8 |
+| Not declared in lockfile | 2 |
+| Other | 8 |
 
-Package transitive yang perlu diperhatikan:
+Transitive packages that deserve extra review:
 
-| Package | Versi | Lisensi |
+| Package | Version | License |
 | --- | --- | --- |
 | `@img/sharp-libvips-*` | `1.2.4` | LGPL-3.0-or-later |
 | `@img/sharp-*` | `0.34.5` | Apache-2.0 AND LGPL-3.0-or-later |
@@ -791,17 +797,5 @@ Package transitive yang perlu diperhatikan:
 | `argparse` | `2.0.1` | Python-2.0 |
 | `caniuse-lite` | `1.0.30001793` | CC-BY-4.0 |
 | `language-subtag-registry` | `0.3.23` | CC0-1.0 |
-| `busboy` | `1.6.0` | Tidak dideklarasikan di lockfile |
-| `streamsearch` | `1.1.0` | Tidak dideklarasikan di lockfile |
-
-## Lisensi Project
-
-Repository ini belum memiliki file `LICENSE`. Jika tujuan Anda adalah merilis sebagai open source, pilih dan tambahkan lisensi project sebelum publikasi.
-
-Pilihan umum:
-
-- MIT: sederhana dan permissive.
-- Apache-2.0: permissive, dengan grant paten eksplisit.
-- GPL-3.0: copyleft kuat.
-
-Pastikan lisensi project kompatibel dengan dependency yang dipakai dan kebijakan distribusi Anda, terutama untuk dependency LGPL pada Python/Node transitive.
+| `busboy` | `1.6.0` | Not declared in lockfile |
+| `streamsearch` | `1.1.0` | Not declared in lockfile |
