@@ -1,0 +1,101 @@
+services:
+  # ── 1. PostgreSQL ──────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - bth_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── 2. API Gateway (Golang/Gin) ────────────────────────────────────────────
+  gateway:
+    build:
+      context: ../../gateway-go
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_OAUTH_CLIENT_IDS: ${GOOGLE_OAUTH_CLIENT_IDS}
+      EXPERT_SERVICE_URL: http://expert:8001
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - gateway_uploads:/app/uploads
+    networks:
+      - bth_internal
+
+  # ── 3. Sistem Pakar (Python/FastAPI) ──────────────────────────────────────
+  expert:
+    build:
+      context: ../../expert-py
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - bth_internal
+
+  # ── 4. Web Admin (Next.js) ────────────────────────────────────────────────────
+  web-admin:
+    build:
+      context: ../../web-admin
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+    depends_on:
+      - gateway
+    networks:
+      - bth_internal
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: "0.50"
+# ── Network privat ─────────────────────────────────────────────────────────
+networks:
+  bth_internal:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
+  gateway_uploads:
+    driver: local
